@@ -70,6 +70,7 @@ The circuit breaker is used to protect GitHub API calls:
 
 ```python
 self.github_circuit = CircuitBreaker("github_api")
+
 # ...
 try:
     return self.github_circuit.execute(func, *args, **kwargs)
