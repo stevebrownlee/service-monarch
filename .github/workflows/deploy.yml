@@ -72,7 +72,7 @@ jobs:
               sleep 5
             done'
 
-      - name: Create deployment directory and files on droplet
+      - name: Copy docker-compose.yml to droplet
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DROPLET_HOST }}
@@ -80,16 +80,20 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             mkdir -p /opt/monarch
-
-      - name: Copy deployment files to droplet
-        uses: appleboy/scp-action@master
-        with:
-          host: ${{ secrets.DROPLET_HOST }}
-          username: root
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "docker-compose.yml"
-          target: "/opt/monarch"
-          overwrite: true
+            cat > /opt/monarch/docker-compose.yml << 'COMPOSE'
+            services:
+              monarch:
+                image: registry.digitalocean.com/${DOCKER_REGISTRY}/monarch:latest
+                ports:
+                  - "8080:8080"
+                  - "8081:8081"
+                environment:
+                  - VALKEY_HOST=${VALKEY_HOST}
+                  - VALKEY_PORT=${VALKEY_PORT}
+                  - GH_PAT=${GH_PAT}
+                  - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+                restart: unless-stopped
+            COMPOSE
 
       - name: Deploy to Digital Ocean droplet
         uses: appleboy/ssh-action@master
