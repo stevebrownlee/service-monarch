@@ -89,6 +89,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "docker-compose.yml"
           target: "/opt/monarch"
+          overwrite: true
 
       - name: Deploy to Digital Ocean droplet
         uses: appleboy/ssh-action@master
