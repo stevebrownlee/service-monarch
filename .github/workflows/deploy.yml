@@ -61,17 +61,26 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Wait for setup to complete
+      - name: Wait for droplet setup to complete
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: root
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          # Wait for both the setup flag AND a live Docker daemon before proceeding.
+          # The flag is only written in main.tf user_data if every step succeeded (set -e),
+          # so this guards against a partial/failed provisioning run.
           script: |
-            timeout 10m bash -c 'while [ ! -f /opt/setup_complete ]; do
-              echo "Waiting for setup to complete..."
-              sleep 5
-            done'
+            timeout 10m bash -c '
+              while true; do
+                if [ -f /opt/setup_complete ] && systemctl is-active --quiet docker; then
+                  echo "Setup complete and Docker is running"
+                  break
+                fi
+                echo "Waiting for droplet setup..."
+                sleep 5
+              done
+            '
 
       - name: Copy docker-compose.yml to droplet
         uses: appleboy/ssh-action@master
@@ -114,8 +123,11 @@ jobs:
             DOCKER_REGISTRY=${{ secrets.DOCKER_REGISTRY }}
             EOF
 
-            # Log into registry
-            docker login -u ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }} -p ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }} registry.digitalocean.com
+            # Log into registry using stdin to avoid CLI password warning
+            echo "${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}" | \
+              docker login registry.digitalocean.com \
+              -u ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }} \
+              --password-stdin
 
             # Deploy
             docker compose pull
